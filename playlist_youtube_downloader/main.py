@@ -1,48 +1,46 @@
-from tkinter import *
-from tkinter import messagebox
-from pytube import Playlist
-from moviepy.editor import *
-from pytube import YouTube
+import os
+from pytube import Playlist,exceptions
+import pytube
+import re
 
+# Obtener la URL de la playlist
+playlist_url = 'https://www.youtube.com/playlist?list=PLzXxn0InEuYjep7QBJT04AkdpLUWgS3d4'
 
-def download_playlist():
-    # Obtener la URL de la lista de reproducción ingresada por el usuario
-    playlist_url = url_entry.get()
+# Crear un objeto Playlist de pytube
+playlist = Playlist(playlist_url)
 
-    # Descargar todos los videos de la lista de reproducción
-    playlist = Playlist(playlist_url)
-    def filter_audio_low_quality(stream):
-        return 'audio' in stream.mime_type and stream.abr <= '128kbps'
-    for video_url in playlist.video_urls:
-        yt = YouTube(video_url)
-        stream = yt.streams.filter(filter_audio_low_quality).first()
-        stream.download(output_path='./audio', filename=yt.title + '.mp4')
+# Obtener el título de la playlist y crear una carpeta con ese nombre
+playlist_title = playlist.title
+os.makedirs(playlist_title, exist_ok=True)
 
-    # Convertir todos los archivos MP4 descargados a MP3
-    for mp4_file in os.listdir('./audio'):
-        if mp4_file.endswith('.mp4'):
-            mp4_path = os.path.join('./audio', mp4_file)
-            mp3_path = os.path.join('./audio', mp4_file[:-4] + '.mp3')
-            audio = AudioFileClip(mp4_path)
-            audio.write_audiofile(mp3_path)
-            os.remove(mp4_path)
+#caracteres especiales
+special_chars_regex = r'[\"\'\\\/\|\?\-\[\]\&\*<>]'
 
-    # Mostrar un mensaje de éxito al usuario
-    messagebox.showinfo('Descarga completada', 'Todos los videos de la lista de reproducción han sido descargados y convertidos a MP3.')
+# Descargar cada video de la playlist
+for video in playlist.videos:
+    # Verificar que el título del video no tenga caracteres no ASCII
+    try:
+        video_title = video.title.encode('ASCII', 'ignore').decode('utf-8')
+        if video_title != video.title or re.search(special_chars_regex, video_title):
+            video_title = re.sub(special_chars_regex, '', video_title)
+        
+        # Descargar el video
+        video.streams.get_lowest_resolution().download(output_path=playlist_title, filename=video_title)
+    except (KeyError, exceptions.PytubeError)as e:
+        print(f"Skipping video with error: {str(e)}")
+        continue  # Ir al siguiente video en caso de error
 
-# Crear una ventana de la aplicación
-root = Tk()
-root.title('Descargar lista de reproducción de YouTube')
+    # Verificar si el archivo de video existe antes de convertirlo a mp3
+    video_file = os.path.join(playlist_title, f'{video_title}')
+    if not os.path.exists(video_file):
+        print(f"Skipping video '{video_title}' because video file not found.")
+        continue  # Ir al siguiente video si el archivo no existe
 
-# Agregar un cuadro de entrada para la URL de la lista de reproducción
-url_label = Label(root, text='URL de la lista de reproducción:')
-url_label.pack()
-url_entry = Entry(root, width=50)
-url_entry.pack()
+    audio_file = os.path.join(playlist_title, f'{video_title}.mp3')
+    os.system(f'ffmpeg -i "{video_file}" -vn -ar 44100 -ac 2 -ab 192k -f mp3 -n "{audio_file}"')
 
-# Agregar un botón para descargar la lista de reproducción
-download_button = Button(root, text='Descargar lista de reproducción', command=download_playlist)
-download_button.pack()
+    # Elimina el archivo de video original
+    os.remove(video_file)
 
-# Ejecutar el bucle principal de la ventana
-root.mainloop()
+print('Descarga finalizada')
+
