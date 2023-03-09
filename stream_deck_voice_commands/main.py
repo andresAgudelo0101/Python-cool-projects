@@ -28,6 +28,7 @@ key_commands = {
     "subir": ["volumeup"],
     "bajar": ["volumedown"],
     "silenciar": ["volumemute"],
+    "atras": ["ctrl","z"]
 }
 
 #inicializamos pygame
