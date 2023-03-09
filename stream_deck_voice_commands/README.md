@@ -1,4 +1,4 @@
-# Strem deck voice command
+# Stream deck voice command
 Crea tus propios comandos de voz para abrir páginas web o realizar acciones con el teclado como atajos o combinaciones de teclas
 
 ## Pasos de instalación
